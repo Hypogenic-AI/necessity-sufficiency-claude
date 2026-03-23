@@ -1,0 +1,27 @@
+{
+  "success": true,
+  "stages": {
+    "resource_finder": {
+      "success": true,
+      "completion_marker": "/workspaces/necessity-sufficiency-claude/.resource_finder_complete",
+      "outputs": {
+        "literature_review": "/workspaces/necessity-sufficiency-claude/literature_review.md",
+        "resources_catalog": "/workspaces/necessity-sufficiency-claude/resources.md",
+        "papers_dir": "/workspaces/necessity-sufficiency-claude/papers",
+        "datasets_dir": "/workspaces/necessity-sufficiency-claude/datasets",
+        "code_dir": "/workspaces/necessity-sufficiency-claude/code"
+      },
+      "log_file": "/workspaces/necessity-sufficiency-claude/logs/resource_finder_claude.log",
+      "transcript_file": "/workspaces/necessity-sufficiency-claude/logs/resource_finder_claude_transcript.jsonl",
+      "elapsed_time": 2052.5136296749115
+    },
+    "experiment_runner": {
+      "success": true,
+      "return_code": 0,
+      "elapsed_time": 646.2095940113068,
+      "log_file": "/workspaces/necessity-sufficiency-claude/logs/execution_claude.log",
+      "transcript_file": "/workspaces/necessity-sufficiency-claude/logs/execution_claude_transcript.jsonl"
+    }
+  },
+  "work_dir": "/workspaces/necessity-sufficiency-claude"
+}

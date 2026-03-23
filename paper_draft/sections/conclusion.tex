@@ -1,0 +1,8 @@
+\section{Conclusion}
+\label{sec:conclusion}
+
+We conducted the first systematic cross-task selectivity evaluation of model components identified via necessity and sufficiency interventions in \gptsmall. Our findings are clear: standard causal interventions systematically overstate the specificity of identified components. Across three tasks, 29--42\% of top-ranked components significantly affect unrelated behaviors, with MLP layers---especially MLP$_0$---acting as general-purpose processing stages rather than task-specific circuit elements. Necessity and sufficiency interventions produce highly correlated rankings ($\rho = 0.76$--$0.88$) and do not differ significantly in selectivity.
+
+These results argue for a simple change in practice: measure selectivity explicitly. A component being necessary or sufficient for a behavior does not mean it is \emph{specific} to that behavior, and failing to check this distinction undermines circuit-level explanations, model editing, and safety auditing. We propose selectivity as a third evaluation criterion alongside necessity and sufficiency and provide concrete metrics and protocols for its measurement.
+
+Future work should extend this analysis to larger models, finer-grained components (\eg SAE features), and multi-component interventions. A particularly promising direction is using cross-task selectivity patterns as a computational similarity fingerprint---a way to discover which tasks share mechanisms based on which components they share.

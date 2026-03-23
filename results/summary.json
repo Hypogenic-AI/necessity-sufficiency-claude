@@ -1,0 +1,64 @@
+{
+  "config": {
+    "model": "gpt2",
+    "n_examples": 100,
+    "seed": 42,
+    "device": "cuda:0",
+    "n_layers": 12,
+    "n_heads": 12,
+    "top_k": 15
+  },
+  "rank_correlations": {
+    "IOI": {
+      "rho": 0.7603925969243412,
+      "pval": 1.1425644653852743e-30
+    },
+    "SV_Agreement": {
+      "rho": 0.8834221049137834,
+      "pval": 1.4485878665693957e-52
+    },
+    "Greater_Than": {
+      "rho": 0.8017448752192947,
+      "pval": 2.9961879525857974e-36
+    }
+  },
+  "selectivity_test": {
+    "statistic": 933.0,
+    "p_value": 0.5237950852247213,
+    "effect_size_d": 0.11468536702827621,
+    "necessity_mean_selectivity": 0.09308113752628784,
+    "sufficiency_mean_selectivity": 0.11212291115535496
+  },
+  "overlap": {
+    "IOI \u2229 SV_Agreement": {
+      "necessity": 3,
+      "sufficiency": 5
+    },
+    "IOI \u2229 Greater_Than": {
+      "necessity": 3,
+      "sufficiency": 5
+    },
+    "SV_Agreement \u2229 Greater_Than": {
+      "necessity": 7,
+      "sufficiency": 6
+    }
+  },
+  "per_task_logit_diffs": {
+    "IOI": {
+      "clean": 1.2239965200424194,
+      "corrupted": -0.7019158601760864
+    },
+    "SV_Agreement": {
+      "clean": 3.31838321685791,
+      "corrupted": -3.31130313873291
+    },
+    "Greater_Than": {
+      "clean": 2.952988624572754,
+      "corrupted": 0.5231564044952393
+    }
+  },
+  "leakage_rates": {
+    "necessity": 0.28888888888888886,
+    "sufficiency": 0.4222222222222222
+  }
+}

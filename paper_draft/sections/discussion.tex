@@ -1,0 +1,42 @@
+\section{Discussion}
+\label{sec:discussion}
+
+\subsection{Implications for Circuit Discovery}
+\label{sec:implications}
+
+Our results have direct consequences for how circuits should be identified and reported.
+
+\para{Selectivity as a required criterion.} Current practice evaluates circuits on faithfulness (does the circuit reproduce the behavior?) and completeness (does removing the circuit degrade it?). Our finding that 29--42\% of top-ranked components leak across tasks shows that these criteria are insufficient. A component can score highly on both necessity and sufficiency for a given task while also affecting unrelated tasks. We argue that selectivity should be reported alongside faithfulness and completeness in all circuit analyses.
+
+\para{MLP layers need special treatment.} The dominance of MLP$_0$ across all tasks reveals a category error in standard component-level analysis. Early MLP layers perform general-purpose transformations (embedding processing, residual stream initialization) that are necessary for \emph{all} model behaviors. Including them in task-specific circuits conflates infrastructure with mechanism. We recommend either excluding early MLP layers from circuit analyses or explicitly distinguishing general-purpose components from task-specific ones.
+
+\para{Implications for model editing.} If a practitioner edits MLP$_0$ to change the model's behavior on \ioi, our results predict that \sva and \gt performance will also be affected. More broadly, any model editing technique that targets components with low selectivity risks unintended side effects. Cross-task selectivity evaluation should precede any targeted intervention on model internals.
+
+\subsection{Why Sufficiency and Necessity Do Not Differ in Selectivity}
+\label{sec:why_no_diff}
+
+We hypothesized that sufficiency (denoising) would produce more selective component rankings than necessity (noising), reasoning that sufficiency tests a more targeted causal claim. This hypothesis was not supported ($p = 0.524$). Two factors may explain this null result.
+
+First, at the component level, both interventions modify the same activations---they differ only in the direction of replacement (clean $\rightarrow$ corrupted vs.\ corrupted $\rightarrow$ clean). A component that mediates multiple tasks will show effects under both interventions, regardless of direction.
+
+Second, the high correlation between necessity and sufficiency rankings ($\rho = 0.76$--$0.88$) means that both methods largely identify the same components. If the same components are selected, their selectivity profiles will naturally be similar. A meaningful difference might emerge with finer-grained mediators (\eg SAE features or learned subspaces) where the mapping between necessity and sufficiency is less tight.
+
+\subsection{Task Similarity Drives Overlap}
+\label{sec:task_similarity}
+
+The pattern of cross-task overlap is informative. \sva and \gt share 40--47\% of their top components, while \ioi shares only 20--33\% with either. This is not random: \sva and \gt both involve syntactic/numerical processing that relies on MLP layers, while \ioi depends on attention-head-mediated name tracking. The degree of component overlap thus reflects genuine computational similarity between tasks, not just noise from general-purpose components.
+
+This observation suggests a constructive use of cross-task evaluation: the pattern of shared and distinct components across tasks could serve as a \emph{fingerprint} of computational similarity, revealing which tasks share mechanisms even when their surface descriptions differ.
+
+\subsection{Limitations}
+\label{sec:limitations}
+
+\para{Single model.} Our experiments use only \gptsmall. Larger models with greater capacity may develop more specialized circuits with higher selectivity. Conversely, they may also develop more complex MLP computations that leak more broadly.
+
+\para{Three tasks.} Three tasks provide limited statistical power for cross-task generalization claims. The leakage rates we report (29--42\%) are specific to this task set. Different tasks---or more tasks---could yield different rates.
+
+\para{Component granularity.} We patch entire attention heads and full MLP layers. Finer-grained analysis at the level of individual neurons, SAE features \citep{marks2024sparse}, or DAS-identified subspaces \citep{geiger2023causal} might reveal more selective units within these components.
+
+\para{Single-component interventions.} We test components individually. Multi-component interventions would reveal circuit-level interactions, such as whether a set of components is jointly selective even if individual members are not.
+
+\para{Self-repair confound.} Necessity scores may be underestimated due to backup mechanisms that compensate for ablated components \citep{heimersheim2024interpret}. This could inflate the apparent leakage rate for necessity if compensation partially masks a component's true contribution to non-target tasks as well.

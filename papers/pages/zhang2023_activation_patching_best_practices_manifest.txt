@@ -1,0 +1,14 @@
+PDF: papers/zhang2023_activation_patching_best_practices.pdf
+Total pages: 27
+Pages per chunk: 3
+
+Chunks:
+  zhang2023_activation_patching_best_practices_chunk_001.pdf: pages 1-3
+  zhang2023_activation_patching_best_practices_chunk_002.pdf: pages 4-6
+  zhang2023_activation_patching_best_practices_chunk_003.pdf: pages 7-9
+  zhang2023_activation_patching_best_practices_chunk_004.pdf: pages 10-12
+  zhang2023_activation_patching_best_practices_chunk_005.pdf: pages 13-15
+  zhang2023_activation_patching_best_practices_chunk_006.pdf: pages 16-18
+  zhang2023_activation_patching_best_practices_chunk_007.pdf: pages 19-21
+  zhang2023_activation_patching_best_practices_chunk_008.pdf: pages 22-24
+  zhang2023_activation_patching_best_practices_chunk_009.pdf: pages 25-27

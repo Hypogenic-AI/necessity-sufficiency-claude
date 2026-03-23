@@ -1,0 +1,20 @@
+\section{Introduction}
+\label{sec:intro}
+
+When mechanistic interpretability researchers claim that a model component ``implements'' a specific behavior, they typically support this claim with one of two causal interventions: ablating the component degrades the behavior (necessity), or patching in the component's activation recovers it (sufficiency). But neither intervention answers a more fundamental question: does this component affect \emph{only} the targeted behavior?
+
+This question---selectivity---is critical for the downstream applications that motivate mechanistic interpretability. Model editing assumes that modifying a component changes one behavior without affecting others. Safety auditing assumes that circuits identified for dangerous capabilities are specific to those capabilities. Scientific explanations of model internals assume that attributing a behavior to a component is a precise statement about that component's role. If nominally ``task-specific'' components also mediate unrelated behaviors, all of these applications are undermined.
+
+Despite its importance, selectivity is rarely measured. \citet{mueller2024quest} explicitly note that selectivity is ``not often explicitly discussed nor measured'' in the field. \citet{arora2024causalgym} introduce a selectivity metric for linear features, but no prior work systematically evaluates whether components identified via standard necessity and sufficiency interventions are specific to their target tasks across multiple behaviors.
+
+We address this gap with the first cross-task selectivity evaluation of components identified via activation patching in \gptsmall. For each of 156 components (144 attention heads and 12 MLP layers), we measure both necessity (noising) and sufficiency (denoising) effects across three tasks spanning distinct linguistic and reasoning domains: Indirect Object Identification (\ioi), Subject-Verb Agreement (\sva), and Greater-Than comparison (\gt). We then test each task's top-ranked components on all other tasks to quantify selectivity.
+
+Our results reveal a systematic problem. On average, 29\% (necessity) to 42\% (sufficiency) of top-15 components for any given task significantly affect at least one unrelated task. The primary culprit is MLP layers: MLP$_0$ ranks first for \emph{all three tasks} under both interventions, acting as a general-purpose processing stage rather than a task-specific circuit element. Necessity and sufficiency rankings are highly correlated ($\rho = 0.76$--$0.88$) and do not differ significantly in selectivity ($p = 0.52$, Cohen's $d = 0.115$).
+
+We make the following contributions:
+\begin{itemize}[leftmargin=*,itemsep=0pt,topsep=0pt]
+    \item We conduct the first systematic cross-task selectivity evaluation of model components identified via necessity and sufficiency interventions, quantifying how often ``important'' components leak across unrelated tasks.
+    \item We compare necessity and sufficiency interventions head-to-head, finding that they produce highly correlated rankings ($\rho = 0.76$--$0.88$) but do not differ in selectivity.
+    \item We identify MLP layers---especially MLP$_0$---as the dominant source of cross-task leakage, demonstrating that standard component-level evaluations systematically conflate general-purpose processing with task-specific circuits.
+    \item We propose selectivity as an explicit third evaluation criterion alongside necessity and sufficiency, providing concrete metrics and experimental protocols for future circuit discovery work.
+\end{itemize}

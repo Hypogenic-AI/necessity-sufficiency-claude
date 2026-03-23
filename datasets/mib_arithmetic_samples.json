@@ -1,0 +1,158 @@
+[
+  {
+    "idx": 0,
+    "template": "Q: How much is {x} plus {y}? A: ",
+    "prompt": "Q: How much is 27 plus 64? A: ",
+    "label": "91",
+    "operator": "+",
+    "num_digit": 2,
+    "random_counterfactual": {
+      "label": 109,
+      "operand1": 72,
+      "operand2": 37,
+      "prompt": "Q: How much is 72 plus 37? A: "
+    },
+    "ones_op1_counterfactual": {
+      "label": 90,
+      "operand1": 26,
+      "operand2": 64,
+      "prompt": "Q: How much is 26 plus 64? A: "
+    },
+    "ones_op2_counterfactual": {
+      "label": 92,
+      "operand1": 27,
+      "operand2": 65,
+      "prompt": "Q: How much is 27 plus 65? A: "
+    },
+    "tens_op1_counterfactual": {
+      "label": 81,
+      "operand1": 17,
+      "operand2": 64,
+      "prompt": "Q: How much is 17 plus 64? A: "
+    },
+    "tens_op2_counterfactual": {
+      "label": 41,
+      "operand1": 27,
+      "operand2": 14,
+      "prompt": "Q: How much is 27 plus 14? A: "
+    },
+    "ones_carry_counterfactual": {
+      "label": 81,
+      "operand1": 20,
+      "operand2": 61,
+      "prompt": "Q: How much is 20 plus 61? A: "
+    },
+    "tens_carry_counterfactual": {
+      "label": 141,
+      "operand1": 77,
+      "operand2": 64,
+      "prompt": "Q: How much is 77 plus 64? A: "
+    },
+    "operand1": 27,
+    "operand2": 64
+  },
+  {
+    "idx": 1,
+    "template": "Q: How much is {x} plus {y}? A: ",
+    "prompt": "Q: How much is 46 plus 98? A: ",
+    "label": "144",
+    "operator": "+",
+    "num_digit": 2,
+    "random_counterfactual": {
+      "label": 55,
+      "operand1": 45,
+      "operand2": 10,
+      "prompt": "Q: How much is 45 plus 10? A: "
+    },
+    "ones_op1_counterfactual": {
+      "label": 143,
+      "operand1": 45,
+      "operand2": 98,
+      "prompt": "Q: How much is 45 plus 98? A: "
+    },
+    "ones_op2_counterfactual": {
+      "label": 141,
+      "operand1": 46,
+      "operand2": 95,
+      "prompt": "Q: How much is 46 plus 95? A: "
+    },
+    "tens_op1_counterfactual": {
+      "label": 174,
+      "operand1": 76,
+      "operand2": 98,
+      "prompt": "Q: How much is 76 plus 98? A: "
+    },
+    "tens_op2_counterfactual": {
+      "label": 134,
+      "operand1": 46,
+      "operand2": 88,
+      "prompt": "Q: How much is 46 plus 88? A: "
+    },
+    "ones_carry_counterfactual": {
+      "label": 134,
+      "operand1": 41,
+      "operand2": 93,
+      "prompt": "Q: How much is 41 plus 93? A: "
+    },
+    "tens_carry_counterfactual": {
+      "label": 44,
+      "operand1": 6,
+      "operand2": 38,
+      "prompt": "Q: How much is 6 plus 38? A: "
+    },
+    "operand1": 46,
+    "operand2": 98
+  },
+  {
+    "idx": 2,
+    "template": "Q: How much is {x} plus {y}? A: ",
+    "prompt": "Q: How much is 27 plus 61? A: ",
+    "label": "88",
+    "operator": "+",
+    "num_digit": 2,
+    "random_counterfactual": {
+      "label": 112,
+      "operand1": 22,
+      "operand2": 90,
+      "prompt": "Q: How much is 22 plus 90? A: "
+    },
+    "ones_op1_counterfactual": {
+      "label": 90,
+      "operand1": 29,
+      "operand2": 61,
+      "prompt": "Q: How much is 29 plus 61? A: "
+    },
+    "ones_op2_counterfactual": {
+      "label": 87,
+      "operand1": 27,
+      "operand2": 60,
+      "prompt": "Q: How much is 27 plus 60? A: "
+    },
+    "tens_op1_counterfactual": {
+      "label": 108,
+      "operand1": 47,
+      "operand2": 61,
+      "prompt": "Q: How much is 47 plus 61? A: "
+    },
+    "tens_op2_counterfactual": {
+      "label": 58,
+      "operand1": 27,
+      "operand2": 31,
+      "prompt": "Q: How much is 27 plus 31? A: "
+    },
+    "ones_carry_counterfactual": {
+      "label": 98,
+      "operand1": 29,
+      "operand2": 69,
+      "prompt": "Q: How much is 29 plus 69? A: "
+    },
+    "tens_carry_counterfactual": {
+      "label": 188,
+      "operand1": 97,
+      "operand2": 91,
+      "prompt": "Q: How much is 97 plus 91? A: "
+    },
+    "operand1": 27,
+    "operand2": 61
+  }
+]

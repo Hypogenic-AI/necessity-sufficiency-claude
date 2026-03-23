@@ -1,0 +1,42 @@
+{
+  "general_purpose_components": [
+    "mlp_0"
+  ],
+  "n_general_purpose": 1,
+  "filtered_selectivity": {
+    "necessity_mean": 0.09513397129851246,
+    "necessity_std": 0.12826654625695352,
+    "sufficiency_mean": 0.11378456671784377,
+    "sufficiency_std": 0.17788547281497347,
+    "mann_whitney_U": 949.0,
+    "p_value": 0.6111790738440003,
+    "cohens_d": 0.12026943169768371
+  },
+  "bootstrap_ci": {
+    "mean_diff": 0.018584373504331425,
+    "ci_lower": -0.04574350578133088,
+    "ci_upper": 0.082986990885021
+  },
+  "original_selectivity": {
+    "necessity_mean": 0.0930811375262878,
+    "sufficiency_mean": 0.11212291115535492
+  },
+  "leakage_rates_original": {
+    "necessity": 0.28888888888888886,
+    "sufficiency": 0.4222222222222222
+  },
+  "component_overlap": {
+    "IOI \u2229 SV_Agreement": {
+      "necessity": 3,
+      "sufficiency": 5
+    },
+    "IOI \u2229 Greater_Than": {
+      "necessity": 3,
+      "sufficiency": 5
+    },
+    "SV_Agreement \u2229 Greater_Than": {
+      "necessity": 7,
+      "sufficiency": 6
+    }
+  }
+}

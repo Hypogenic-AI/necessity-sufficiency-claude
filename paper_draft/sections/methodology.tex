@@ -1,0 +1,85 @@
+\section{Methodology}
+\label{sec:method}
+
+\subsection{Model and Components}
+\label{sec:model}
+
+We study \gptsmall \citep{radford2019language}, a 12-layer transformer with 12 attention heads per layer ($d_\text{model} = 768$). We evaluate all 156 components: 144 attention heads (indexed as H$_{\ell.h}$ for layer $\ell$, head $h$) and 12 MLP layers (indexed as MLP$_\ell$). We use TransformerLens for all model access and activation patching.
+
+\subsection{Tasks and Datasets}
+\label{sec:tasks}
+
+We construct three task datasets, each with 100 clean/corrupted prompt pairs. The tasks span distinct linguistic and reasoning domains to enable meaningful cross-task selectivity evaluation.
+
+\para{Indirect Object Identification (\ioi).} The model must predict the indirect object in sentences like ``When Anna and David went to the store, David gave a ball to \underline{\hspace{1em}}.'' The correct answer is the name that is \emph{not} the subject of the final clause (here, ``Anna'').
+
+\para{Subject-Verb Agreement (\sva).} The model must predict the correct verb form given a subject with an intervening attractor: ``The dog above the books \underline{\hspace{1em}}'' $\rightarrow$ ``is'' (not ``are'').
+
+\para{Greater-Than (\gt).} The model must predict a valid continuation digit for a year comparison: ``The war lasted from 1758 to 17\underline{\hspace{1em}}'' $\rightarrow$ any digit $\geq 6$.
+
+\subsection{Corruption Strategy}
+\label{sec:corruption}
+
+Following \citet{zhang2023best}, we use symmetric token replacement (\str) rather than Gaussian noise to avoid off-distribution artifacts. For \ioi, we replace names with different names (changing the correct indirect object). For \sva, we swap singular/plural subjects and attractors (flipping the required verb number). For \gt, we change the reference year (shifting valid continuation digits). All tokens are verified as single tokens in \gptsmall's vocabulary.
+
+\subsection{Intervention Procedures}
+\label{sec:interventions}
+
+For each component $c$ and task $t$, we compute two scores:
+
+\para{Necessity (noising).} We run the model on clean input $x$ and replace component $c$'s activations with those from the corrupted input $\tilde{x}$. The necessity score measures how much the logit difference drops:
+\begin{equation}
+    \text{Nec}(c, t) = \frac{\logitdiff(x) - \logitdiff(x \mid c \leftarrow \tilde{c})}{\totaleffect}
+    \label{eq:necessity}
+\end{equation}
+where $\totaleffect = \logitdiff(x) - \logitdiff(\tilde{x})$ is the total effect of corruption.
+
+\para{Sufficiency (denoising).} We run the model on corrupted input $\tilde{x}$ and replace component $c$'s activations with those from the clean input $x$. The sufficiency score measures how much the logit difference recovers:
+\begin{equation}
+    \text{Suf}(c, t) = \frac{\logitdiff(\tilde{x} \mid c \leftarrow c^*) - \logitdiff(\tilde{x})}{\totaleffect}
+    \label{eq:sufficiency}
+\end{equation}
+where $c^*$ denotes the clean activation.
+
+Both scores are normalized by $\totaleffect$ to enable comparison across tasks with different effect magnitudes.
+
+\subsection{Cross-Task Selectivity}
+\label{sec:selectivity}
+
+For each task $t$, we identify the top-$K$ components by absolute effect size ($K = 15$, approximately 10\% of all components). We then measure each component's effect on all other tasks.
+
+\para{Selectivity score.} For a component $c$ identified as important for task $t$:
+\begin{equation}
+    \text{Sel}(c, t) = |\text{Effect}(c, t)| - \frac{1}{|T \setminus t|} \sum_{t' \in T \setminus t} |\text{Effect}(c, t')|
+    \label{eq:selectivity}
+\end{equation}
+Positive values indicate the component is more specific to its target task.
+
+\para{Cross-task leakage.} A component \emph{leaks} if its maximum absolute effect on any non-target task exceeds a threshold $\tau = 0.05$ (5\% of normalized effect). The leakage rate is the fraction of top-$K$ components that leak.
+
+\subsection{Statistical Analysis}
+\label{sec:stats}
+
+We compare necessity and sufficiency rankings using Spearman rank correlation. We test whether the two intervention types differ in selectivity using the Mann-Whitney U test (appropriate for non-normal distributions of selectivity scores). We compute bootstrap 95\% confidence intervals for the selectivity difference (10,000 resamples) and report Cohen's $d$ for effect size.
+
+\subsection{Hyperparameters}
+\label{sec:hyperparams}
+
+\tabref{tab:hyperparams} summarizes the experimental configuration.
+
+\begin{table}[t]
+    \centering
+    \begin{tabular}{@{}llp{6cm}@{}}
+        \toprule
+        \textbf{Parameter} & \textbf{Value} & \textbf{Justification} \\
+        \midrule
+        Examples per task & 100 & Sufficient for stable patching estimates \\
+        Batch size & 25 & Memory-efficient; 4 batches per task \\
+        Top-$K$ & 15 & ${\sim}10\%$ of components; standard in \mi \\
+        Leakage threshold $\tau$ & 0.05 & 5\% of normalized effect \\
+        Random seed & 42 & Reproducibility \\
+        \bottomrule
+    \end{tabular}
+    \caption{Experimental hyperparameters.}
+    \label{tab:hyperparams}
+\end{table}

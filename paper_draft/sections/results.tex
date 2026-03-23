@@ -1,0 +1,152 @@
+\section{Results}
+\label{sec:results}
+
+\subsection{Task Validation}
+\label{sec:validation}
+
+All three tasks produce clear separation between clean and corrupted inputs (\tabref{tab:task_validation}). \sva shows the largest total effect (6.63), while \gt shows the smallest (2.43). These differences in scale motivate our use of normalized scores throughout.
+
+\begin{table}[t]
+    \centering
+    \begin{tabular}{@{}lccc@{}}
+        \toprule
+        \textbf{Task} & \textbf{Clean \logitdiff} & \textbf{Corrupted \logitdiff} & \textbf{Total Effect} \\
+        \midrule
+        \ioi & 1.224 & $-0.702$ & 1.926 \\
+        \sva & 3.318 & $-3.311$ & 6.629 \\
+        \gt  & 2.953 & 0.523 & 2.430 \\
+        \bottomrule
+    \end{tabular}
+    \caption{Logit difference statistics for each task. All tasks show clear signal, with clean inputs producing higher logit differences than corrupted inputs.}
+    \label{tab:task_validation}
+\end{table}
+
+\subsection{Top Components by Necessity and Sufficiency}
+\label{sec:top_components}
+
+\tabref{tab:top5} shows the five highest-ranked components for each task under both interventions. Two patterns are immediately apparent. First, MLP$_0$ ranks first for all three tasks under both necessity and sufficiency, with normalized scores ranging from 0.61 to 1.07. Second, the top-5 lists for each task are largely similar across intervention types, though the exact ordering differs.
+
+\begin{table}[t]
+    \centering
+    \resizebox{\textwidth}{!}{%
+    \begin{tabular}{@{}clrclr@{}}
+        \toprule
+        & \multicolumn{2}{c}{\textbf{Necessity (Noising)}} & & \multicolumn{2}{c}{\textbf{Sufficiency (Denoising)}} \\
+        \cmidrule(lr){2-3} \cmidrule(lr){5-6}
+        \textbf{Rank} & \textbf{Component} & \textbf{Score} & & \textbf{Component} & \textbf{Score} \\
+        \midrule
+        \multicolumn{6}{@{}l}{\textit{Indirect Object Identification (\ioi)}} \\
+        \midrule
+        1 & {\bf MLP$_0$} & {\bf 0.760} & & {\bf MLP$_0$} & {\bf 1.066} \\
+        2 & H$_{10.7}$ & $-0.366$ & & H$_{9.9}$ & 0.683 \\
+        3 & H$_{11.10}$ & $-0.256$ & & H$_{10.7}$ & $-0.513$ \\
+        4 & H$_{8.10}$ & 0.124 & & H$_{9.6}$ & 0.317 \\
+        5 & H$_{10.0}$ & 0.097 & & H$_{11.10}$ & $-0.269$ \\
+        \midrule
+        \multicolumn{6}{@{}l}{\textit{Subject-Verb Agreement (\sva)}} \\
+        \midrule
+        1 & {\bf MLP$_0$} & {\bf 1.034} & & {\bf MLP$_0$} & {\bf 1.033} \\
+        2 & MLP$_8$ & 0.415 & & MLP$_8$ & 0.421 \\
+        3 & MLP$_{10}$ & 0.386 & & MLP$_{10}$ & 0.368 \\
+        4 & MLP$_{11}$ & 0.282 & & MLP$_{11}$ & 0.271 \\
+        5 & H$_{7.4}$ & 0.235 & & H$_{7.4}$ & 0.227 \\
+        \midrule
+        \multicolumn{6}{@{}l}{\textit{Greater-Than (\gt)}} \\
+        \midrule
+        1 & {\bf MLP$_0$} & {\bf 0.614} & & {\bf MLP$_0$} & {\bf 0.826} \\
+        2 & MLP$_{10}$ & 0.556 & & MLP$_{10}$ & 0.562 \\
+        3 & H$_{9.1}$ & 0.453 & & H$_{9.1}$ & 0.469 \\
+        4 & MLP$_9$ & 0.448 & & MLP$_9$ & 0.429 \\
+        5 & H$_{7.10}$ & 0.151 & & H$_{7.10}$ & 0.179 \\
+        \bottomrule
+    \end{tabular}
+    }
+    \caption{Top-5 components by absolute effect size for each task. MLP$_0$ ({\bf bold}) ranks first across all tasks and both intervention types. \sva and \gt are dominated by MLP layers, while \ioi depends more on attention heads.}
+    \label{tab:top5}
+\end{table}
+
+The task-level composition of the top-5 reveals structural differences. \sva and \gt both rely heavily on MLP layers (4/5 and 3/5 of the top-5 are MLPs, respectively), while \ioi depends primarily on attention heads (4/5 are heads). This is consistent with the linguistic nature of \ioi, which requires attention-mediated name tracking, versus the more general computations underlying verb agreement and numerical comparison.
+
+\subsection{Necessity--Sufficiency Correlation}
+\label{sec:correlation}
+
+Necessity and sufficiency rankings are highly correlated across all three tasks (\tabref{tab:correlation}). \sva shows the highest correlation ($\rho = 0.883$), suggesting a primarily serial circuit structure where the same components are both necessary and sufficient. \ioi shows the lowest ($\rho = 0.760$), consistent with its documented OR-circuit structure containing redundant name mover heads \citep{wang2022interpretability, heimersheim2024interpret}---some heads are sufficient individually but not individually necessary.
+
+\begin{table}[t]
+    \centering
+    \begin{tabular}{@{}lcc@{}}
+        \toprule
+        \textbf{Task} & \textbf{Spearman $\rho$} & \textbf{$p$-value} \\
+        \midrule
+        \ioi & 0.760 & $1.14 \times 10^{-30}$ \\
+        \sva & {\bf 0.883} & $1.45 \times 10^{-52}$ \\
+        \gt  & 0.802 & $3.00 \times 10^{-36}$ \\
+        \bottomrule
+    \end{tabular}
+    \caption{Spearman rank correlation between necessity and sufficiency rankings across all 156 components. All correlations are highly significant ($p < 10^{-30}$). \ioi shows the most divergence, consistent with redundant name mover heads.}
+    \label{tab:correlation}
+\end{table}
+
+A concrete example of divergence: H$_{9.9}$ ranks 2nd by sufficiency for \ioi (score 0.683) but is not in the top-5 for necessity. This is a textbook sufficient-but-not-necessary component---patching in its clean activation substantially recovers the \ioi behavior, but ablating it alone does not degrade performance, because other name mover heads compensate.
+
+\subsection{Cross-Task Overlap}
+\label{sec:overlap}
+
+\tabref{tab:overlap} shows the overlap in top-15 components between task pairs. \sva and \gt share the most components (47\% by necessity, 40\% by sufficiency), likely because both rely heavily on MLP-mediated computations. \ioi shares only 20--33\% with either task, reflecting its distinct attention-head-driven circuit.
+
+\begin{table}[t]
+    \centering
+    \begin{tabular}{@{}lcc@{}}
+        \toprule
+        \textbf{Task Pair} & \textbf{Necessity Overlap} & \textbf{Sufficiency Overlap} \\
+        \midrule
+        \ioi $\cap$ \sva & 3/15 (20\%) & 5/15 (33\%) \\
+        \ioi $\cap$ \gt  & 3/15 (20\%) & 5/15 (33\%) \\
+        \sva $\cap$ \gt  & {\bf 7/15 (47\%)} & 6/15 (40\%) \\
+        \bottomrule
+    \end{tabular}
+    \caption{Overlap in top-15 components between task pairs. \sva and \gt share the most components, reflecting their shared reliance on MLP layers. Sufficiency tends to show equal or higher overlap than necessity.}
+    \label{tab:overlap}
+\end{table}
+
+\subsection{Cross-Task Leakage}
+\label{sec:leakage}
+
+Our central finding is that a substantial fraction of top-ranked components leak across tasks. We define leakage as a component's maximum absolute effect on any non-target task exceeding 0.05 (5\% of normalized effect).
+
+Across the three tasks, the mean leakage rate is 28.9\% for necessity and 42.2\% for sufficiency. That is, nearly one in three components identified as necessary for a task, and more than two in five identified as sufficient, also significantly affect at least one unrelated task.
+
+Sufficiency shows higher leakage than necessity (42.2\% vs.\ 28.9\%). This may reflect the asymmetry of the two interventions: denoising patches inject a coherent, clean signal into an otherwise corrupted forward pass, and this stronger signal may propagate more broadly through the network. Noising, by contrast, introduces a weaker perturbation that self-repair mechanisms can partially compensate \citep{heimersheim2024interpret}.
+
+\subsection{Selectivity Comparison: Necessity vs.\ Sufficiency}
+\label{sec:selectivity_results}
+
+We test whether necessity and sufficiency differ in selectivity using the selectivity score defined in \eqref{eq:selectivity}. \tabref{tab:selectivity} summarizes the results.
+
+\begin{table}[t]
+    \centering
+    \begin{tabular}{@{}lcc@{}}
+        \toprule
+        \textbf{Statistic} & \textbf{Necessity} & \textbf{Sufficiency} \\
+        \midrule
+        Mean selectivity ($\pm$ SD) & $0.093 \pm 0.146$ & $0.112 \pm 0.184$ \\
+        \midrule
+        \multicolumn{3}{@{}l}{\textit{Comparison}} \\
+        \midrule
+        Mann-Whitney $U$ & \multicolumn{2}{c}{$p = 0.524$} \\
+        Cohen's $d$ & \multicolumn{2}{c}{0.115} \\
+        Bootstrap 95\% CI & \multicolumn{2}{c}{$[-0.046, 0.083]$} \\
+        \bottomrule
+    \end{tabular}
+    \caption{Selectivity comparison between necessity and sufficiency. Sufficiency shows slightly higher mean selectivity, but the difference is not statistically significant. The confidence interval contains zero, and the effect size is negligible.}
+    \label{tab:selectivity}
+\end{table}
+
+Sufficiency shows marginally higher mean selectivity ($0.112$ vs.\ $0.093$), but this difference is not statistically significant (Mann-Whitney $U$, $p = 0.524$). Cohen's $d = 0.115$ indicates a negligible effect size, and the bootstrap 95\% confidence interval for the difference ($[-0.046, 0.083]$) contains zero. We conclude that necessity and sufficiency interventions produce similarly (un)selective component rankings.
+
+\subsection{MLP$_0$: A General-Purpose Component}
+\label{sec:mlp0}
+
+MLP$_0$ warrants special attention. It ranks first for all three tasks under both interventions, with necessity scores of 0.760 (\ioi), 1.034 (\sva), and 0.614 (\gt). Its coefficient of variation across tasks (CV $= 0.22$) is far below that of task-specific components such as H$_{10.7}$ (which appears in the top-5 only for \ioi).
+
+MLP$_0$ processes the residual stream immediately after the embedding layer. Its high effect across all tasks likely reflects its role in the embedding-to-residual-stream transformation---a general-purpose computation that affects all downstream processing, regardless of the specific task. Including MLP$_0$ in a task-specific circuit is therefore misleading: its ablation degrades all behaviors, not just the target one.

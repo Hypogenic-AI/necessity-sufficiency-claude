@@ -1,0 +1,783 @@
+You are an academic paper writer. Generate a complete NEURIPS style paper
+based on the experiment results provided.
+
+════════════════════════════════════════════════════════════════════════════════
+                         IMPORTANT: BEFORE YOU START
+════════════════════════════════════════════════════════════════════════════════
+
+Before writing any content, you MUST complete these steps:
+
+1. READ THE SKILL: Review the paper-writer skill at .claude/skills/paper-writer/SKILL.md
+2. READ THE STYLE GUIDE: Study templates/paper_writing/lab_style_guide.md carefully
+3. REVIEW EXAMPLES: Browse paper_examples/ for formatting and language patterns:
+   - Look at sections/1.introduction.tex for language style
+   - Look at tables/*.tex for table formatting
+   - Look at commands/*.tex for macro usage
+4. VERIFY COMMAND TEMPLATES: Command templates (math.tex, general.tex, macros.tex) are pre-copied to paper_draft/commands/
+
+CRITICAL: Reference example papers for FORMATTING and LANGUAGE STYLE only.
+Do NOT copy content, phrasing, or narrative structure from the example papers.
+The examples are in a different research domain - focus only on presentation style.
+
+════════════════════════════════════════════════════════════════════════════════
+                            EXPERIMENT REPORT
+════════════════════════════════════════════════════════════════════════════════
+
+# Necessity, Sufficiency, and Selectivity in Mechanistic Interpretability
+
+## 1. Executive Summary
+
+We conducted the first systematic cross-task selectivity evaluation of model components identified via necessity (ablation/noising) and sufficiency (activation patching/denoising) interventions in GPT-2 Small. Across three tasks (Indirect Object Identification, Subject-Verb Agreement, Greater-Than comparison), we found that **29–42% of top-ranked components exhibit significant cross-task leakage**—they substantially affect behaviors unrelated to their target task. Necessity and sufficiency rankings are highly correlated (Spearman ρ = 0.76–0.88) but not identical, with sufficiency showing slightly (non-significantly) higher selectivity. The dominant source of leakage is MLP layers (especially MLP_0), which act as general-purpose processing stages rather than task-specific circuits. These findings demonstrate that standard necessity/sufficiency evaluations systematically overstate the causal specificity of identified components and that explicit selectivity measurement is essential for valid circuit attribution.
+
+## 2. Goal
+
+**Hypothesis**: Current mechanistic interpretability interventions (ablation for necessity, activation patching for sufficiency) insufficiently address selectivity—whether a component affects *only* the targeted behavior. Improving definitions and evaluations to capture selectivity will clarify causal roles.
+
+**Why this matters**: If components identified as &#34;important&#34; for behavior X also strongly affect unrelated behaviors Y and Z, then attributing X specifically to those components is misleading. This undermines model editing, safety auditing, and scientific understanding built on circuit-level explanations.
+
+**Expected impact**: Quantifying selectivity as a third evaluation criterion (alongside necessity and sufficiency) will lead to more precise circuit discovery and more reliable mechanistic explanations.
+
+## 3. Data Construction
+
+### Dataset Description
+
+We constructed three task datasets for GPT-2 Small, each with 100 clean/corrupted prompt pairs:
+
+| Task | Description | Source | Clean Example | Answer |
+|------|-------------|--------|---------------|--------|
+| IOI | Indirect Object Identification | Custom (MIB-inspired) | &#34;When Anna and David went to the store, David gave a ball to&#34; | Anna |
+| SV Agreement | Subject-Verb Number Agreement | Custom (BLiMP-inspired) | &#34;The dog above the books&#34; | is |
+| Greater-Than | Year comparison reasoning | Custom (Nanda-inspired) | &#34;The war lasted from 1758 to 17&#34; | ≥6 |
+
+### Corruption Strategy
+
+Following Zhang &amp; Nanda (2023), we use **symmetric token replacement (STR)** rather than Gaussian noise:
+- **IOI**: Replace names with different names (changes correct indirect object)
+- **SV Agreement**: Swap singular/plural subjects and attractors (flips required verb number)
+- **Greater-Than**: Change the reference year (shifts valid continuation digits)
+
+### Data Quality
+
+- All tokens verified as single-token in GPT-2&#39;s vocabulary (names prefixed with space)
+- 100 examples per task → 4 batches of 25 for patching
+- Logit differences validated: all tasks show clear signal (clean LD &gt; corrupted LD)
+
+| Task | Clean Logit Diff | Corrupted Logit Diff | Total Effect |
+|------|-----------------|---------------------|--------------|
+| IOI | 1.224 | -0.702 | 1.926 |
+| SV Agreement | 3.318 | -3.311 | 6.629 |
+| Greater-Than | 2.953 | 0.523 | 2.430 |
+
+## 4. Experiment Description
+
+### Methodology
+
+#### High-Level Approach
+
+For each of 156 components (144 attention heads + 12 MLP layers) in GPT-2 Small, we measure:
+1. **Necessity** (noising): Run on clean input, replace one component&#39;s activations with corrupted counterpart. If logit difference drops, the component is necessary.
+2. **Sufficiency** (denoising): Run on corrupted input, replace one component&#39;s activations with clean counterpart. If logit difference recovers, the component is sufficient.
+
+We then compute **cross-task selectivity** by testing each task&#39;s top-K components on all other tasks.
+
+#### Why This Method?
+
+- Activation patching is the standard causal intervention in MI (Heimersheim &amp; Nanda, 2024)
+- Using both directions (noising/denoising) directly compares necessity vs. sufficiency
+- Cross-task evaluation is novel—existing work evaluates on single tasks only
+- STR corruption avoids the off-distribution issues of Gaussian noise (Zhang &amp; Nanda, 2023)
+
+### Implementation Details
+
+#### Tools and Libraries
+- Python 3.12.8
+- PyTorch 2.10.0+cu128
+- TransformerLens (latest)
+- SciPy 1.15.3
+- NumPy, Matplotlib, Seaborn, Pandas
+
+#### Model
+- GPT-2 Small: 12 layers, 12 attention heads per layer, d_model=768
+- Total components evaluated: 156 (144 heads + 12 MLPs)
+
+#### Hyperparameters
+| Parameter | Value | Justification |
+|-----------|-------|---------------|
+| n_examples | 100 | Sufficient for stable patching estimates |
+| batch_size | 25 | Memory-efficient on GPU |
+| top_k | 15 | ~10% of components; standard in MI |
+| seed | 42 | Reproducibility |
+| leakage_threshold | 0.05 | 5% of normalized effect |
+
+#### Hardware
+- NVIDIA RTX A6000 (49GB VRAM) × 4 (only 1 GPU used)
+- Total experiment time: ~68 seconds for all 3 tasks
+
+### Evaluation Metrics
+
+1. **Necessity Score**: (clean_LD - patched_LD) / total_effect. How much logit difference drops when component is noised.
+2. **Sufficiency Score**: (patched_LD - corrupted_LD) / total_effect. How much logit difference recovers when component is denoised.
+3. **Selectivity**: |target_effect| - mean(|other_effects|). Positive = more specific to target task.
+4. **Cross-Task Leakage**: Fraction of top-K components with max(|other_effect|) &gt; 0.05.
+5. **Rank Correlation**: Spearman ρ between necessity and sufficiency rankings (by absolute effect).
+
+### Raw Results
+
+#### Top-5 Components by Necessity and Sufficiency
+
+**IOI Task:**
+| Rank | Necessity | Score | Sufficiency | Score |
+|------|-----------|-------|-------------|-------|
+| 1 | MLP_0 | 0.760 | MLP_0 | 1.066 |
+| 2 | H10.7 | -0.366 | H9.9 | 0.683 |
+| 3 | H11.10 | -0.256 | H10.7 | -0.513 |
+| 4 | H8.10 | 0.124 | H9.6 | 0.317 |
+| 5 | H10.0 | 0.097 | H11.10 | -0.269 |
+
+**SV Agreement Task:**
+| Rank | Necessity | Score | Sufficiency | Score |
+|------|-----------|-------|-------------|-------|
+| 1 | MLP_0 | 1.034 | MLP_0 | 1.033 |
+| 2 | MLP_8 | 0.415 | MLP_8 | 0.421 |
+| 3 | MLP_10 | 0.386 | MLP_10 | 0.368 |
+| 4 | MLP_11 | 0.282 | MLP_11 | 0.271 |
+| 5 | H7.4 | 0.235 | H7.4 | 0.227 |
+
+**Greater-Than Task:**
+| Rank | Necessity | Score | Sufficiency | Score |
+|------|-----------|-------|-------------|-------|
+| 1 | MLP_0 | 0.614 | MLP_0 | 0.826 |
+| 2 | MLP_10 | 0.556 | MLP_10 | 0.562 |
+| 3 | H9.1 | 0.453 | H9.1 | 0.469 |
+| 4 | MLP_9 | 0.448 | MLP_9 | 0.429 |
+| 5 | H7.10 | 0.151 | H7.10 | 0.179 |
+
+#### Rank Correlations (Necessity vs. Sufficiency)
+
+| Task | Spearman ρ | p-value |
+|------|-----------|---------|
+| IOI | 0.760 | 1.14 × 10⁻³⁰ |
+| SV Agreement | 0.883 | 1.45 × 10⁻⁵² |
+| Greater-Than | 0.802 | 3.00 × 10⁻³⁶ |
+
+#### Cross-Task Overlap (Top-15 Components)
+
+| Task Pair | Necessity Overlap | Sufficiency Overlap |
+|-----------|------------------|---------------------|
+| IOI ∩ SV Agreement | 3/15 (20%) | 5/15 (33%) |
+| IOI ∩ Greater-Than | 3/15 (20%) | 5/15 (33%) |
+| SV Agreement ∩ Greater-Than | 7/15 (47%) | 6/15 (40%) |
+
+#### Cross-Task Leakage Rates
+
+| Intervention | Mean Leakage Rate |
+|-------------|------------------|
+| Necessity | 28.9% |
+| Sufficiency | 42.2% |
+
+#### Selectivity Scores
+
+| Measure | Necessity | Sufficiency | Difference |
+|---------|-----------|-------------|------------|
+| Mean Selectivity | 0.093 ± 0.146 | 0.112 ± 0.184 | +0.019 |
+| Mann-Whitney U | — | — | p = 0.524 |
+| Cohen&#39;s d | — | — | 0.115 |
+| 95% CI (bootstrap) | — | — | [-0.046, 0.083] |
+
+## 5. Result Analysis
+
+### Key Findings
+
+**Finding 1: Necessity and sufficiency are highly correlated but not identical.**
+Spearman rank correlations range from 0.76 (IOI) to 0.88 (SV Agreement), all highly significant (p &lt; 10⁻³⁰). This indicates that both interventions largely agree on which components matter. However, IOI shows the lowest correlation (ρ = 0.760), consistent with the OR-circuit structure documented in the IOI literature (Wang et al., 2022): redundant name mover heads are sufficient individually but not individually necessary, creating divergence between the two measures.
+
+**Finding 2: A substantial fraction of &#34;important&#34; components leak across tasks.**
+On average, 29% (necessity) to 42% (sufficiency) of top-15 components for any given task significantly affect at least one unrelated task. This directly supports our hypothesis (H3) that current single-task evaluations overestimate causal specificity. Sufficiency shows higher leakage (42% vs. 29%), though this difference was not statistically tested for significance.
+
+**Finding 3: MLP layers are the primary source of cross-task leakage.**
+MLP_0 is the top component for ALL three tasks under both necessity and sufficiency. Its coefficient of variation across tasks (CV = 0.22) is far below the threshold for task-specific components, confirming it as a general-purpose processing stage. MLP_8, MLP_9, and MLP_10 also show significant cross-task effects, particularly between SV Agreement and Greater-Than.
+
+**Finding 4: Sufficiency and necessity do NOT significantly differ in selectivity.**
+The Mann-Whitney U test yields p = 0.524 (all components) and p = 0.611 (excluding general-purpose). Bootstrap 95% CI for the difference: [-0.046, 0.083], containing zero. Cohen&#39;s d = 0.115 (negligible effect). Hypothesis H2 (sufficiency is more selective) is **not supported**. Both intervention types have similar selectivity profiles.
+
+**Finding 5: Task similarity drives overlap more than intervention type.**
+SV Agreement and Greater-Than share 47% of top-15 necessity components and 40% of sufficiency components, while IOI shares only 20–33% with either. This likely reflects that SV Agreement and Greater-Than both rely heavily on MLP-mediated computations, while IOI depends more on attention-head-mediated circuits (name movers, duplicate token heads).
+
+### Hypothesis Testing Results
+
+| Hypothesis | Prediction | Result | Supported? |
+|------------|-----------|--------|-----------|
+| H1: Moderate overlap between necessity/sufficiency | ρ ∈ [0.3, 0.7] | ρ ∈ [0.76, 0.88] | **Partially** — higher correlation than expected |
+| H2: Sufficiency more selective than necessity | Higher selectivity scores | Diff = +0.019, p = 0.52 | **Not supported** |
+| H3: &gt;30% of top-K components affect non-target tasks | &gt;30% leakage | 29–42% leakage | **Supported** |
+
+### Surprises and Insights
+
+1. **MLP_0 dominance**: MLP_0 accounts for 60–100% of the normalized effect in all tasks. This is not a task-specific circuit but rather the embedding/unembedding transformation pathway. Its presence at the top of every ranking inflates both necessity and sufficiency scores across all tasks.
+
+2. **SV Agreement has near-identical necessity and sufficiency rankings** (ρ = 0.883). This suggests a primarily serial/AND-gate circuit structure for this task in GPT-2 Small, where the same components are both necessary and sufficient.
+
+3. **IOI shows the most divergence** between necessity and sufficiency (ρ = 0.760), consistent with documented redundancy in name mover heads (Heimersheim &amp; Nanda, 2024). H9.9 ranks 2nd by sufficiency but is not in the top-5 for necessity—a textbook example of a sufficient-but-not-necessary component.
+
+4. **Sufficiency shows higher leakage than necessity** (42% vs. 29%). This may be because denoising patches &#34;inject&#34; a stronger, more coherent signal that propagates more broadly through the network, while noising creates a weaker, noisier perturbation that is partially compensated by self-repair mechanisms.
+
+### Error Analysis
+
+- **Self-repair confound**: Some necessity scores may be underestimated due to backup mechanisms compensating for ablated components. This is a known limitation documented by Heimersheim &amp; Nanda (2024).
+- **Normalization sensitivity**: We normalize by total effect (clean_LD - corrupted_LD). For Greater-Than (total effect = 2.43), this is smaller than SV Agreement (6.63), making normalized scores harder to compare across tasks.
+- **Dataset size**: 100 examples per task may not capture the full distribution of model behaviors. However, patching effects are typically stable at this scale.
+
+### Limitations
+
+1. **Single model**: Results are for GPT-2 Small only. Larger models may show different selectivity patterns due to increased capacity for specialized circuits.
+2. **Three tasks**: While chosen to span different linguistic/reasoning domains, three tasks provide limited statistical power for cross-task generalization claims.
+3. **Component granularity**: We patch entire attention heads and full MLP layers. Finer-grained analysis (individual neurons, SAE features, subspaces) might reveal more selective components.
+4. **Simple corruption**: STR corruption changes multiple aspects of the input simultaneously. More targeted counterfactuals (e.g., single-name swaps) could isolate specific information channels.
+5. **No causal scrubbing**: We test single-component interventions only. Multi-component interventions would reveal circuit-level interactions.
+
+## 6. Conclusions
+
+### Summary
+
+Current necessity and sufficiency evaluations in mechanistic interpretability **systematically fail to distinguish task-specific components from general-purpose processing stages**. In GPT-2 Small, 29–42% of top-ranked components for any given task also significantly affect unrelated tasks. The primary source of this leakage is MLP layers (especially early MLPs), which contribute to many behaviors simultaneously. Necessity and sufficiency interventions do not differ significantly in their selectivity, and both provide similar (highly correlated) component rankings.
+
+### Implications
+
+- **For MI practitioners**: Always measure cross-task selectivity when claiming a component &#34;implements&#34; a specific behavior. A component being necessary or sufficient for a behavior does not mean it is *specific* to that behavior.
+- **For benchmark designers**: Existing MI benchmarks (MIB, CausalGym) should incorporate explicit cross-task selectivity metrics alongside faithfulness (sufficiency) and completeness (necessity).
+- **For circuit discovery**: MLP layers, particularly early ones, should be treated differently from attention heads in circuit analyses. Their general-purpose nature means their ablation/patching effects are uninformative about task-specific mechanisms.
+- **For model editing**: Editing general-purpose components (like MLP_0) to change one behavior will likely affect many other behaviors—a direct safety concern.
+
+### Confidence in Findings
+
+**High confidence**: The leakage finding (29–42%) is robust across all three tasks and both intervention types. The MLP_0 dominance is unambiguous.
+
+**Moderate confidence**: The lack of difference between necessity and sufficiency selectivity (p = 0.52) could be a power issue. With more tasks or finer-grained components, a difference might emerge.
+
+**Lower confidence**: Exact leakage rates are sensitive to the threshold (0.05) and the choice of tasks. Different task sets could yield different rates.
+
+## 7. Next Steps
+
+### Immediate Follow-ups
+1. **Extend to more models**: Replicate on Pythia-70M, Pythia-410M, and Gemma-2-2B to test if selectivity patterns scale with model capacity.
+2. **Finer-grained components**: Use SAE features or DAS-identified subspaces instead of full heads/MLPs. The Sparse Feature Circuits framework (Marks et al., 2024) suggests SAE features might be more selective.
+3. **Multi-component interventions**: Test whether circuits (sets of components) show better selectivity than individual components.
+
+### Alternative Approaches
+- **CausalGym-style control tasks**: Use explicitly constructed control tasks (matching surface statistics but differing in target phenomenon) for more rigorous selectivity measurement.
+- **Information-theoretic selectivity**: Compute mutual information between component activations and task labels across multiple tasks simultaneously.
+
+### Open Questions
+1. Does selectivity improve with model scale (more capacity for specialized circuits)?
+2. Are SAE features genuinely more selective than neurons, or does the MIB (2025) negative result generalize?
+3. Can selectivity be optimized during circuit discovery, rather than measured post-hoc?
+4. What is the relationship between polysemanticity (multiple features per neuron) and cross-task leakage?
+
+## References
+
+1. Mueller, A., et al. (2024). &#34;The Quest for the Right Mediator: A History, Survey, and Theoretical Grounding of Causal Interpretability.&#34; arXiv:2408.01416.
+2. Heimersheim, S. &amp; Nanda, N. (2024). &#34;How to Use and Interpret Activation Patching.&#34; arXiv:2404.15255.
+3. Zhang, F. &amp; Nanda, N. (2023). &#34;Towards Best Practices of Activation Patching.&#34; arXiv:2309.16042.
+4. Arora, A., Jurafsky, D., &amp; Potts, C. (2024). &#34;CausalGym: Benchmarking Causal Interpretability Methods.&#34; arXiv:2402.12560.
+5. Mueller, A., et al. (2025). &#34;MIB: A Mechanistic Interpretability Benchmark.&#34; arXiv:2504.13151.
+6. Marks, S., et al. (2024). &#34;Sparse Feature Circuits: Discovering and Editing Interpretable Causal Graphs in Language Models.&#34; arXiv:2403.19647.
+7. Wang, K., et al. (2022). &#34;Interpretability in the Wild.&#34; arXiv:2211.00593.
+8. Sharkey, L., et al. (2025). &#34;Open Problems in Mechanistic Interpretability.&#34; arXiv:2501.16496.
+9. Geiger, A., et al. (2023). &#34;Causal Abstraction: A Theoretical Foundation.&#34; arXiv:2301.04709.
+
+
+════════════════════════════════════════════════════════════════════════════════
+                            RESEARCH PLAN
+════════════════════════════════════════════════════════════════════════════════
+
+# Research Plan: Necessity, Sufficiency, and Selectivity in Mechanistic Interpretability
+
+## Motivation &amp; Novelty Assessment
+
+### Why This Research Matters
+Mechanistic interpretability aims to identify which model components causally drive specific behaviors. Current practice relies on necessity (ablation) and sufficiency (activation patching) tests, but these tell us whether a component matters for a behavior—not whether it matters *only* for that behavior. Without selectivity, we risk attributing behaviors to polysemantic or general-purpose components, undermining the utility of circuit-level explanations for model editing, safety auditing, and scientific understanding.
+
+### Gap in Existing Work
+Mueller et al. (2024) explicitly identify selectivity as &#34;not often explicitly discussed nor measured.&#34; CausalGym (Arora et al., 2024) introduces a selectivity metric but only for 1D linear features on linguistic tasks. MIB (2025) evaluates sufficiency (CPR) and necessity (CMD) but not cross-task selectivity. No existing work systematically measures whether components identified via necessity vs. sufficiency interventions differ in their selectivity profiles.
+
+### Our Novel Contribution
+We conduct the first systematic cross-task selectivity evaluation of components identified via necessity (ablation) and sufficiency (activation patching) interventions. We measure whether top components for one task also affect unrelated tasks, and compare selectivity profiles between necessity-ranked and sufficiency-ranked components. This reveals whether the choice of intervention type affects the specificity of discovered circuits.
+
+### Experiment Justification
+- **Experiment 1 (Component Ranking)**: Rank all attention heads and MLP layers by necessity and sufficiency scores across 3 tasks. Needed to establish which components each method identifies as important.
+- **Experiment 2 (Cross-Task Selectivity)**: Test top-K components from each task on all other tasks. Needed to quantify selectivity—the core gap identified in the literature.
+- **Experiment 3 (Necessity vs. Sufficiency Divergence)**: Compare rank orderings between necessity and sufficiency. Tests whether these interventions identify the same or different components, and whether they differ in selectivity.
+
+## Research Question
+Do components identified as necessary (via ablation) and sufficient (via activation patching) for a specific behavior differ in their selectivity—i.e., their specificity to that behavior vs. unrelated behaviors?
+
+## Hypothesis Decomposition
+- H1: Components ranked highly by necessity and sufficiency will show significant overlap but not be identical.
+- H2: Components identified via sufficiency (denoising patching) will show higher selectivity than those identified via necessity (noising/ablation), because sufficiency tests a more targeted causal claim.
+- H3: Current single-task evaluations overestimate the causal specificity of identified components—many &#34;important&#34; components will also affect unrelated tasks.
+
+## Proposed Methodology
+
+### Approach
+Use GPT-2 Small with TransformerLens. For three distinct tasks (IOI, subject-verb agreement, greater-than/arithmetic), perform both noising (necessity) and denoising (sufficiency) activation patching across all attention heads and MLP layers. Then test the top-K components from each task on all other tasks to measure selectivity.
+
+### Experimental Steps
+1. Load GPT-2 Small via TransformerLens
+2. Prepare datasets: IOI (from MIB), subject-verb agreement (from BLiMP), and a third distinct task
+3. For each task: run noising patching (necessity) and denoising patching (sufficiency) across all 144 attention heads and 12 MLP layers
+4. Rank components by effect size for each task × intervention type
+5. For top-K components per task: measure effect on all other tasks
+6. Compute selectivity scores and compare across intervention types
+7. Statistical analysis of divergence and selectivity differences
+
+### Baselines
+- Random component selection (null baseline for selectivity)
+- Mean ablation vs. zero ablation vs. resampling ablation (comparing ablation types)
+
+### Evaluation Metrics
+- **Necessity score**: Logit difference drop when component is ablated (noised)
+- **Sufficiency score**: Logit difference recovery when component is patched (denoised)
+- **Selectivity**: Effect on target task minus mean effect on non-target tasks
+- **Rank correlation**: Spearman ρ between necessity and sufficiency rankings
+- **Cross-task leakage**: Fraction of top-K components that significantly affect ≥1 non-target task
+
+### Statistical Analysis Plan
+- Spearman rank correlation for necessity vs. sufficiency rankings (α=0.05)
+- Paired t-test or Wilcoxon signed-rank for selectivity differences
+- Bootstrap confidence intervals for selectivity scores
+- Multiple comparison correction via Benjamini-Hochberg FDR
+
+## Expected Outcomes
+- H1 supported if Spearman ρ is moderate (0.3-0.7) between necessity and sufficiency rankings
+- H2 supported if sufficiency-identified components show significantly higher selectivity
+- H3 supported if &gt;30% of top-K components show significant effects on non-target tasks
+
+## Timeline and Milestones
+1. Environment setup and data prep: 15 min
+2. Core patching infrastructure: 30 min
+3. Run patching experiments across 3 tasks: 45 min
+4. Cross-task selectivity evaluation: 30 min
+5. Analysis and visualization: 30 min
+6. Documentation: 30 min
+
+## Potential Challenges
+- Self-repair/Hydra effect may confound necessity results → document and analyze
+- Task difficulty differences may affect absolute scores → use normalized metrics
+- Some components may be general-purpose (LayerNorm, embeddings) → focus on attention heads and MLPs
+
+## Success Criteria
+- Completed cross-task selectivity measurements for ≥3 tasks
+- Quantified divergence between necessity and sufficiency rankings
+- Statistical test of selectivity difference between intervention types
+- Clear visualization of results
+
+
+════════════════════════════════════════════════════════════════════════════════
+                          LITERATURE REVIEW
+════════════════════════════════════════════════════════════════════════════════
+
+# Literature Review: Necessity, Sufficiency, and Selectivity in Mechanistic Interpretability
+
+## Research Area Overview
+
+Mechanistic interpretability (MI) aims to reverse-engineer the internal computations of neural networks by identifying causal relationships between model components and behaviors. The dominant methodology uses **causal interventions** on internal activations to determine which components mediate specific behaviors. Two fundamental intervention types map to the philosophical concepts of necessity and sufficiency:
+
+- **Necessity** (tested via ablation): Does removing/corrupting a component degrade the behavior?
+- **Sufficiency** (tested via activation patching): Does restoring/injecting a component&#39;s activation recover/produce the behavior?
+
+A critical but under-explored third criterion is **selectivity**: Does the component specifically affect *only* the targeted behavior, or does it also influence unrelated behaviors? Mueller et al. (2024) explicitly identify selectivity as &#34;not often explicitly discussed nor measured&#34; and note that the assumption that maximizing faithfulness and sparsity implicitly optimizes selectivity remains unverified.
+
+## Key Papers
+
+### Paper 1: The Quest for the Right Mediator (Mueller et al., 2024)
+- **Authors**: Aaron Mueller, Jannik Brinkmann, Millicent Li, et al.
+- **Year**: 2024
+- **Source**: arXiv:2408.01416
+- **Key Contribution**: Comprehensive survey organizing MI through the lens of causal mediation analysis, taxonomized by **mediator type** (full layers, neurons, attention heads, non-basis-aligned subspaces, non-linear features) rather than by method.
+- **Methodology**: Maps Pearl&#39;s causal mediation framework to MI. Defines indirect effect (IE) as the core metric. Identifies four evaluation criteria: **sparsity**, **generality**, **selectivity**, **faithfulness**.
+- **Key Findings on Necessity/Sufficiency/Selectivity**:
+  - Ablations (zero, mean, resampling) test **necessity**: &#34;They allow us to tell whether any of the information in a mediator is necessary for a model to perform the task&#34; -- high recall, low precision
+  - Activation patching (input-dependent deterministic) tests **sufficiency**: replacing a component with a contrastive value tests if it suffices to flip behavior
+  - **Selectivity is the key undermeasured criterion**: defined as explaining &#34;only the phenomenon of interest and as little else as possible.&#34; Neurons are &#34;sparse but not selective&#34; due to polysemanticity. Non-basis-aligned directions offer significant selectivity advantages.
+  - Provides decision tree: explaining behavior → SAE features; verifying hypothesis → DAS; localization/editing → exhaustive search over layers/neurons
+- **Datasets**: IOI, subject-verb agreement, factual recall, greater-than, gender bias, entity tracking, addition, MCQA, toxicity
+- **Code**: References pyvene, TransformerLens, MIB benchmark
+
+### Paper 2: How to Use and Interpret Activation Patching (Heimersheim &amp; Nanda, 2024)
+- **Authors**: Stefan Heimersheim, Neel Nanda
+- **Year**: 2024
+- **Source**: arXiv:2404.15255
+- **Key Contribution**: Explicit conceptual framework mapping patching directions to necessity vs. sufficiency. Central insight: **denoising tests sufficiency; noising tests necessity**, and these are NOT symmetric.
+- **Key Findings**:
+  - **AND circuits** (serial components): Noising finds all necessary components; denoising fails (neither alone is sufficient)
+  - **OR circuits** (parallel/redundant): Denoising finds all sufficient components; noising fails (neither alone is necessary due to redundancy)
+  - Denoising finds a &#34;cross-section&#34; of the circuit, not the full circuit
+  - **Hydra effect/self-repair**: Backup heads compensate when primary components are ablated (~0.7x compensation), complicating necessity claims
+  - Logit difference is the recommended metric for selectivity (controls for shared effects)
+
+### Paper 3: Towards Best Practices of Activation Patching (Zhang &amp; Nanda, 2023)
+- **Authors**: Fred Zhang, Neel Nanda
+- **Year**: 2023
+- **Source**: arXiv:2309.16042
+- **Key Contribution**: Systematic empirical comparison of corruption methods and metrics across 5 tasks.
+- **Key Findings**:
+  - Gaussian noising (GN) vs. symmetric token replacement (STR) can lead to inconsistent circuit discovery. GN puts model off-distribution, breaking internal mechanisms. STR preferred.
+  - Probability metric fails to detect negative components (floor effect). Logit difference preferred.
+  - Which tokens are corrupted determines what information flows are traced
+  - Sliding window patching produces 20%+ more peak effect than summing individual layers
+
+### Paper 4: CausalGym (Arora et al., 2024)
+- **Authors**: Aryaman Arora, Daniel Jurafsky, Christopher Potts
+- **Year**: 2024
+- **Source**: arXiv:2402.12560
+- **Key Contribution**: Benchmark for comparing causal interpretability methods on 29 linguistic tasks from SyntaxGym. Introduces **selectivity metric** adapted from control tasks.
+- **Methods Evaluated**: DAS, linear probing, difference-in-means, LDA, PCA, k-means, random
+- **Key Findings on Selectivity**:
+  - DAS achieves highest raw causal efficacy but also performs well on arbitrary control tasks
+  - After selectivity adjustment, probing exceeds DAS at larger scales (4.24 vs 3.34 at pythia-1b)
+  - Selectivity = odds-ratio on real task minus odds-ratio on control task
+- **Models**: Pythia family (14M to 6.9B)
+- **Code**: github.com/aryamanarora/causalgym
+
+### Paper 5: MIB: A Mechanistic Interpretability Benchmark (Mueller et al., 2025)
+- **Authors**: Aaron Mueller, Atticus Geiger, Sarah Wiegreffe, et al.
+- **Year**: 2025
+- **Source**: arXiv:2504.13151
+- **Key Contribution**: Two-track benchmark: circuit localization (finding minimal subgraphs) and causal variable localization (finding feature representations).
+- **Tasks**: IOI, Arithmetic, MCQA, ARC, RAVEL
+- **Key Findings**:
+  - EAP-IG-inputs with counterfactual ablations best for circuit localization
+  - DAS consistently best for causal variable localization
+  - **SAE features do NOT improve over standard neurons** for causal variable localization -- notable negative result
+  - CPR measures sufficiency (circuit alone reproduces behavior); CMD measures necessity (removing circuit degrades behavior)
+- **Models**: GPT-2 Small, Qwen-2.5 0.5B, Gemma-2 2B, Llama-3.1 8B
+- **Code**: github.com/aaronmueller/MIB
+
+### Paper 6: Sparse Feature Circuits (Marks et al., 2024)
+- **Authors**: Samuel Marks, Can Rager, Eric Michaud, et al.
+- **Year**: 2024
+- **Source**: arXiv:2403.19647
+- **Key Contribution**: Discovers circuits using SAE features instead of neurons/attention heads. Introduces SHIFT method for removing task-irrelevant features.
+- **Key Findings**:
+  - ~100 SAE features explain subject-verb agreement in Pythia-70M (vs ~1500 neurons)
+  - Faithfulness (sufficiency) and completeness (necessity) evaluated
+  - SHIFT demonstrates selectivity in practice: ablating human-judged irrelevant features removes gender bias while preserving profession classification
+- **Code**: github.com/saprmarks/feature-circuits
+
+### Paper 7: Causal Abstraction: A Theoretical Foundation (Geiger et al., 2023)
+- **Authors**: Atticus Geiger, Duligur Ibeling, Amir Zur, et al.
+- **Year**: 2023
+- **Source**: arXiv:2301.04709
+- **Key Contribution**: Formal theoretical framework grounding MI in causal abstraction theory. Defines interchange intervention accuracy (IIA) as a measure of counterfactual faithfulness.
+
+### Paper 8: Mechanistic Interpretability for AI Safety -- A Review (Bereska &amp; Gavves, 2024)
+- **Authors**: Leonard Bereska, Efstratios Gavves
+- **Year**: 2024
+- **Source**: arXiv:2404.14082
+- **Key Contribution**: Comprehensive review with explicit AND/OR logic framing of necessity vs. sufficiency in activation patching.
+- **Key Findings**: Clean-to-corrupted patching tests sufficiency (OR gates); corrupted-to-clean tests necessity (AND gates). Self-repair/Hydra effect confounds necessity claims.
+
+### Paper 9: Open Problems in Mechanistic Interpretability (Sharkey et al., 2025)
+- **Authors**: Lee Sharkey et al.
+- **Year**: 2025
+- **Source**: arXiv:2501.16496
+- **Key Contribution**: Identifies SDL (sparse dictionary learning) limitations for selectivity: feature splitting, feature absorption, interpretability illusions.
+- **Key Findings**: SDL activations describe but are not mechanisms; sparsity is not a good proxy for interpretability; no canonical causal mediators identified despite formal causal frameworks.
+
+## Common Methodologies
+
+### Intervention Types
+- **Ablation** (necessity): Zero, mean, resampling ablation -- Used in Papers 1, 2, 3, 5, 6, 8
+- **Activation patching** (sufficiency): Replace activations from contrastive input -- Used in Papers 1, 2, 3, 5, 8
+- **Path patching**: Restrict effects to specific downstream paths -- Used in Papers 2, 6
+- **DAS/Boundless DAS** (sufficiency via optimization): Learn subspaces -- Used in Papers 1, 4, 5, 7
+- **Attribution patching** (gradient approximation): Fast O(1) approximation -- Used in Papers 5, 6
+
+### Circuit Discovery Methods
+- Exhaustive activation patching over components
+- Attribution patching (gradient-based approximation)
+- Edge attribution patching with integrated gradients (EAP-IG)
+- SAE feature circuit discovery
+
+## Standard Baselines
+- Random features/circuits (lower bound)
+- Full vector intervention (upper bound for causal variable localization)
+- Difference-in-means (simple but competitive)
+- Linear probing (correlational, not causal)
+- DAS (current state-of-art for causal variable localization)
+
+## Evaluation Metrics
+- **Faithfulness/CPR**: Does the circuit/feature reproduce the behavior? (sufficiency)
+- **Completeness/CMD**: Does the complement fail to reproduce? (necessity)
+- **IIA**: Interchange intervention accuracy (causal faithfulness)
+- **Logit difference**: Preferred metric -- controls for shared effects, linear in residual stream
+- **Selectivity**: Real task performance minus control task performance (CausalGym)
+- **Log odds-ratio**: CausalGym&#39;s primary causal efficacy metric
+
+## Gaps and Opportunities
+
+1. **Selectivity is systematically under-measured**: Mueller et al. (2024) explicitly states this. Only CausalGym (2024) introduces a selectivity metric, and only for 1D linear features.
+
+2. **Necessity ≠ ¬Sufficiency**: Heimersheim &amp; Nanda (2024) show these give different results depending on circuit structure (AND vs OR gates). No systematic framework quantifies the gap.
+
+3. **Self-repair/Hydra effect undermines necessity claims**: When components are ablated, backup mechanisms compensate. This is documented but not systematically quantified across tasks.
+
+4. **SAE features may not improve selectivity**: MIB (2025) shows SAE features perform no better than neurons for causal variable localization. This challenges a core assumption of the feature-based interpretability paradigm.
+
+5. **No cross-task selectivity benchmark exists**: Current benchmarks evaluate methods on individual tasks. No benchmark systematically measures whether identified components are specific to one task or involved in many.
+
+## Recommendations for Our Experiment
+
+Based on the literature review:
+
+- **Recommended datasets**: MIB benchmark tasks (IOI, Arithmetic, MCQA) with counterfactual pairs; CausalGym linguistic tasks for selectivity evaluation; BLiMP for additional linguistic coverage
+- **Recommended baselines**: DAS, difference-in-means, linear probing, attribution patching (EAP-IG), random features
+- **Recommended metrics**: Faithfulness (sufficiency), completeness (necessity), selectivity (cross-task specificity), logit difference as primary output metric
+- **Recommended models**: GPT-2 Small (most studied, fastest), Pythia-70M (SAE feature circuits available), Gemma-2 2B (SAE coverage via GemmaScope)
+- **Methodological considerations**:
+  - Use symmetric token replacement over Gaussian noise for corruption
+  - Test both patching directions (denoising for sufficiency, noising for necessity)
+  - Measure selectivity explicitly by testing identified components on unrelated tasks
+  - Use logit difference as primary metric, report probability and KL divergence as secondary
+  - Account for self-repair effects when interpreting necessity results
+
+
+════════════════════════════════════════════════════════════════════════════════
+                          PAPER REQUIREMENTS
+════════════════════════════════════════════════════════════════════════════════
+
+Generate a complete academic paper with the following structure:
+
+1. TITLE
+   - Clear, specific, informative
+   - Should convey main finding or contribution
+
+2. AUTHOR
+   - Use this exact author line in the \author{} block: Ari Holtzman and NeuriCo
+
+3. ABSTRACT (150-250 words)
+   - Problem statement
+   - Approach
+   - Key results
+   - Significance
+
+4. INTRODUCTION
+   - Research problem and motivation
+   - Gap in existing work
+   - Our contribution (be specific)
+   - Paper organization
+
+5. RELATED WORK
+   - Organized by theme/approach
+   - Position our work relative to prior work
+   - Cite papers from literature review
+
+6. METHODOLOGY
+   - Clear description of approach
+   - Experimental setup
+   - Datasets used
+   - Evaluation metrics
+   - Baselines
+
+7. RESULTS
+   - Present results with tables and figures
+   - Statistical analysis
+   - Comparison to baselines
+   - Ablation studies (if applicable)
+
+8. DISCUSSION
+   - Interpretation of results
+   - Limitations
+   - Broader implications
+
+9. CONCLUSION
+   - Summary of contributions
+   - Key findings
+   - Future work
+
+10. REFERENCES
+   - BibTeX format
+   - All cited papers
+
+════════════════════════════════════════════════════════════════════════════════
+                          OUTPUT FORMAT
+════════════════════════════════════════════════════════════════════════════════
+
+Create a MODULAR LaTeX project with the following directory structure:
+
+paper_draft/
+├── main.tex              # Main file that imports all sections
+├── references.bib        # BibTeX references
+├── sections/
+│   ├── abstract.tex      # Abstract content
+│   ├── introduction.tex  # Introduction section
+│   ├── related_work.tex  # Related work section
+│   ├── methodology.tex   # Methodology section
+│   ├── results.tex       # Results section
+│   ├── discussion.tex    # Discussion section
+│   └── conclusion.tex    # Conclusion section
+├── figures/              # Directory for any generated figures
+├── tables/               # Directory for complex standalone tables
+└── appendix/             # Directory for appendix sections (if needed)
+
+INSTRUCTIONS:
+1. First, create the directory structure above (mkdir -p paper_draft/sections paper_draft/figures paper_draft/tables paper_draft/appendix)
+2. Write main.tex using the EXACT preamble for NEURIPS:
+
+   \documentclass{article}
+   \usepackage[final]{neurips_2025}  % NEURIPS style (neurips_2025.sty is in paper_draft/)
+   \usepackage[hidelinks]{hyperref}  % REQUIRED: clickable links
+   \usepackage{booktabs}  % REQUIRED: professional tables
+   \usepackage{graphicx}
+   \usepackage{amsmath,amssymb}
+
+   % Import command files
+   \input{commands/math}
+   \input{commands/general}
+   \input{commands/macros}
+
+   % Use this bibliography style:
+   \bibliographystyle{plainnat}
+
+   \author{Ari Holtzman and NeuriCo}
+
+   - Use \input{sections/...} to include each section
+   - Use \bibliography{references} for references
+3. Write each section file with COMPLETE content (no placeholders)
+4. Each section file should include its \section{} command
+5. Write references.bib with all citations in BibTeX format
+6. After writing all files, compile the paper:
+   cd paper_draft && pdflatex -interaction=nonstopmode main.tex && bibtex main && pdflatex -interaction=nonstopmode main.tex && pdflatex -interaction=nonstopmode main.tex
+
+This modular structure allows humans to easily:
+- Edit individual sections without navigating a large file
+- Track changes per section
+- Reuse sections across different paper versions
+
+════════════════════════════════════════════════════════════════════════════════
+                          QUALITY REQUIREMENTS
+════════════════════════════════════════════════════════════════════════════════
+
+- Academic tone throughout
+- All claims must be supported by data from the experiment report
+- Proper citations using \cite{} commands
+- Clear figures and tables with proper captions
+- NO placeholder text - every section must have real content
+- The paper MUST compile without errors
+- If compilation fails, debug and fix the LaTeX errors
+
+════════════════════════════════════════════════════════════════════════════════
+                          LAB WRITING STYLE
+════════════════════════════════════════════════════════════════════════════════
+
+Follow these lab-specific conventions to match our paper style:
+
+1. LANGUAGE STYLE:
+   - Use active voice: "We propose", "We examine", "We focus on"
+   - Be direct and confident: "Our main question is...", "We hypothesize that..."
+   - State things clearly and simply - prefer plain language over jargon
+   - Use bold questions as paragraph organizers: {\bf what is X?}
+   - Include specific quantitative claims: "8.97% over baseline"
+   - Avoid fancy wording: "utilize" → "use", "facilitate" → "help"
+
+2. INTRODUCTION STRUCTURE:
+   - Engaging hook (get to the point quickly)
+   - Problem importance
+   - Gap identification
+   - Your approach with method figure reference
+   - Quantitative preview of results
+   - Contribution bullets (3-4 items, action verbs)
+
+3. CONTRIBUTION LISTS:
+   \begin{itemize}[leftmargin=*,itemsep=0pt,topsep=0pt]
+       \item We propose...
+       \item We conduct...
+       \item We complement...
+   \end{itemize}
+
+4. MODULAR COMMANDS STRUCTURE:
+   Command templates are pre-copied to paper_draft/commands/:
+   - math.tex: Math notation macros
+   - general.tex: Formatting macros
+   - macros.tex: Project-specific term definitions (customize this for your paper)
+
+   In main.tex, include:
+   \input{commands/math}
+   \input{commands/general}
+   \input{commands/macros}
+
+5. REFERENCE CONVENTIONS:
+   Use reference macros from math.tex:
+   - \figref{fig:name} for "figure 1" (lowercase, in-sentence)
+   - \Figref{fig:name} for "Figure 1" (capitalized, start of sentence)
+   - \secref{sec:name} for "section 2"
+
+6. TEXT FORMATTING:
+   - Use \para{Header text} for bold paragraph headers
+   - Define method/dataset names with \textsc and \xspace:
+     \newcommand{\methodname}{\textsc{MethodName}\xspace}
+
+7. TABLE FORMATTING:
+   - Use booktabs package (no vertical lines)
+   - Use \resizebox{\textwidth}{!}{...} for wide tables
+   - Use @{} to remove padding at table edges
+   - Use \cmidrule(lr){x-y} for sub-headers
+   - Use \textsc{} for dataset/method names in headers
+   - Bold best results with {\bf ...}
+
+8. FIGURE FORMATTING:
+   - Use 0.32\textwidth for 3-column subfigures
+   - Use 0.95\linewidth for full-width figures
+   - Use \input{figures/legend} for shared legends
+   - Write self-contained captions explaining key observations
+
+9. RESULTS PRESENTATION:
+   - Define \increase and \decrease for colored arrows (green up, red down)
+   - Bold best results in tables
+   - Report confidence intervals when available
+
+10. ALGORITHM STYLING:
+    - Use algpseudocode with [noend]
+    - Use \triangleright for comments
+
+11. HYPERLINKS (REQUIRED):
+    - Always use \usepackage[hidelinks]{hyperref} or with colored links
+    - All citations, section refs, figure refs, table refs must be clickable
+    - This is essential for reader navigation
+
+════════════════════════════════════════════════════════════════════════════════
+                          WORKFLOW: REVIEW AND REFLECT
+════════════════════════════════════════════════════════════════════════════════
+
+Before calling finish, you MUST complete these review steps:
+
+1. REVIEW RESOURCES (at the start):
+   - Read .claude/skills/paper-writer/SKILL.md for detailed guidance
+   - Study templates/paper_writing/lab_style_guide.md for style conventions
+   - Browse paper_examples/ for formatting and language patterns
+
+2. SELF-REFLECTION (before finishing):
+   After writing all sections, review your work against these criteria:
+
+   LANGUAGE CHECK:
+   - [ ] Is the writing clear and jargon-free?
+   - [ ] Are claims specific with quantitative support?
+   - [ ] Is active voice used throughout?
+
+   FORMATTING CHECK:
+   - [ ] Does main.tex include \input{commands/math}, \input{commands/general}, \input{commands/macros}?
+   - [ ] Is hyperref package included for clickable references?
+   - [ ] Do tables use booktabs (no vertical lines)?
+   - [ ] Are best results bolded in tables?
+   - [ ] Are figures/tables properly captioned?
+
+   STRUCTURE CHECK:
+   - [ ] Does introduction follow: hook → importance → gap → approach → preview → contributions?
+   - [ ] Are contribution bullets specific with action verbs?
+   - [ ] Does the paper compile without errors?
+
+3. FIX ISSUES:
+   - Address any issues found in the self-reflection
+   - Re-compile and verify the PDF looks correct
+
+Only after completing this review should you consider the paper finished.
