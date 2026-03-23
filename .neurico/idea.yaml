@@ -1,0 +1,31 @@
+idea:
+  title: Necessity, Sufficiency, and Selectivity
+  domain: machine_learning
+  hypothesis: "Current mechanistic interpretability interventions often use necessity\
+    \ (ablation) and sufficiency (activation amplification) to link model components\
+    \ to behaviors, but these approaches insufficiently address selectivity\u2014\
+    whether the component specifically affects only the targeted behavior or also\
+    \ influences unrelated behaviors. Improving definitions and evaluations of necessity\
+    \ and sufficiency to better capture selectivity will clarify the causal role of\
+    \ components in model behaviors.\n"
+  background:
+    description: 'In mechanistic interpretability interventions, necessity and sufficiency
+      are commonly assessed by ablating or amplifying components and observing effects
+      on specific behaviors. However, these interventions often fail to capture selectivity:
+      whether the component affects only the intended behavior or also impacts unrelated
+      behaviors. Current evaluations, such as checking model perplexity on unrelated
+      data or performance on benchmarks like MMLU, are insufficient. There is a need
+      to refine definitions and evaluation methods to better distinguish necessity,
+      sufficiency, and selectivity, and to understand the causes of leakage in current
+      approaches.
+
+      '
+  metadata:
+    author: Ari Holtzman
+    source: IdeaHub
+    source_url: https://hypogenic.ai/ideahub/idea/lFLYN3AqEPxjiygIyvt9
+    idea_id: necessity__sufficiency__and_se_20260323_014014_d8e9ac48
+    created_at: '2026-03-23T01:40:14.460872'
+    status: submitted
+    github_repo_name: necessity-sufficiency-claude
+    github_repo_url: https://github.com/Hypogenic-AI/necessity-sufficiency-claude
